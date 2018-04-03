@@ -1,0 +1,156 @@
+{{define "content"}}
+
+<div id="alertreload"></div>
+
+<div class="container">
+  <div class="row">
+      <div class="col-md-12">
+        <div id="timer"></div>
+      </div>
+  </div>
+
+  <form id="myform">
+
+    <div class="row">
+      <div class="col-md-3">
+          <img style="position: absolute;" src="/img/pi.png" alt="pi">
+      </div>
+      <div class="col-md-3">
+        <div class="input-group">
+          <div class="input-group-prepend">
+            <div class="input-group-text"><i class="fas fa-user-secret"></i></div>
+          </div>
+          <input id="password" name="password" type="password" class="form-control" id="inlineFormInputGroup" placeholder="password" title="4 to 6 characters in the range [a-z]"> 
+          <div class="input-group-append">
+            <span class="input-group-text" id="basic-addon2">[a-z]{4,6}</span>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+          <i>1</i><i class="fas fa-server"></i>&nbsp;&nbsp;<input id="nbnodes" name="nbnodes" data-slider-id='nbnodesSlider' type="text" data-slider-min="0" data-slider-max="8" data-slider-step="4" data-slider-value="8"/>&nbsp;&nbsp;<i>8</i>&nbsp;<i class="fas fa-server"></i>&nbsp;<i class="fas fa-server"></i>&nbsp;<i class="fas fa-server"></i>&nbsp;<i class="fas fa-server"></i>&nbsp;<i class="fas fa-server"></i>&nbsp;<i class="fas fa-server"></i>&nbsp;<i class="fas fa-server"></i>&nbsp;<i class="fas fa-server"></i>
+      </div>
+    </div>
+
+    <br>
+
+    <div class="row">
+      <div class="col-md-6 offset-md-3">
+        <button id="submit" class="btn btn-primary" type="button" onclick="crack()">let's crack !</button>
+      </div>
+      <div class="col-md-3"></div>
+    </div>
+
+  </form>
+    
+  <br>
+
+  <div class="row">
+    <div class="col-md-12">
+      <ul class="list-group">
+        <li class="list-group-item" id="n1"><span class="badge badge-default badge-pill"><i class="fas fa-server"></i>&nbsp;1</span></li>
+        <li class="list-group-item" id="n2"><span class="badge badge-default badge-pill"><i class="fas fa-server"></i>&nbsp;2</span></li>
+        <li class="list-group-item" id="n3"><span class="badge badge-default badge-pill"><i class="fas fa-server"></i>&nbsp;3</span></li>
+        <li class="list-group-item" id="n4"><span class="badge badge-default badge-pill"><i class="fas fa-server"></i>&nbsp;4</span></li>
+        <li class="list-group-item" id="n5"><span class="badge badge-default badge-pill"><i class="fas fa-server"></i>&nbsp;5</span></li>
+        <li class="list-group-item" id="n6"><span class="badge badge-default badge-pill"><i class="fas fa-server"></i>&nbsp;6</span></li>
+        <li class="list-group-item" id="n7"><span class="badge badge-default badge-pill"><i class="fas fa-server"></i>&nbsp;7</span></li>
+        <li class="list-group-item" id="n8"><span class="badge badge-default badge-pill"><i class="fas fa-server"></i>&nbsp;8</span></li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+{{end}}
+{{define "contentjs"}}
+<script>
+$('#nbnodes').slider({
+  tooltip: 'always'
+});
+
+$("#myform").validate({
+  errorClass: "alert alert-danger",
+  rules: {
+    password: {
+      required: true,
+      minlength: 2,
+      pattern: "[a-z]{4,6}"
+    }
+  }
+});
+
+function crack() {
+  $('#timer').timer();
+
+  $("input#password").attr("disabled", true);
+  $("button#submit").attr("disabled", true);
+
+        var password = $("input#password").val();
+        var nbnodes = $("input#nbnodes").val();
+            $.ajax({
+                url: "/crack",
+                method: "PUT",
+                dataType: 'json',
+                data: {
+                  password: password,
+                  nbnodes: nbnodes,
+                },
+            }).done(function(data, textStatus, jqXHR) {
+            }).fail(function(jqXHR, textStatus, errorThrown) {
+                handleHTTPError(jqXHR.statusText, jqXHR.status)
+            });
+}
+
+// websocket
+if (window.WebSocket === undefined) {
+    $("#content").append("your browser does not support WebSockets");
+} else {
+    if (window.location.protocol == "https:") {
+        wsproto = "wss";
+    } else {
+        wsproto = "ws";
+    }
+    url = wsproto + "://{{.Address}}:{{.Port}}/socket/";
+    
+    var wsock = new WebSocket(url);
+    wsock.onopen = function(evt) {
+        console.log("connected to web socket:" + url);
+    };
+    wsock.onclose = function(evt) {
+        console.log("web socket closed");
+        newd = $("<div class=\"alert alert-light\" role=\"alert\">Reload the page before submitting a new password</div>").hide().fadeIn(500);
+        $("#alertreload").append(newd);
+    };
+    wsock.onmessage = function(evt) {
+        var json = JSON.parse(evt.data);
+        var jobid = json.jobid;
+        var node = json.node;
+        var result = json.result;
+        var pass = json.pass;
+        console.log(json);
+
+        // job element
+        var j = $("#j"+jobid);
+        // node element
+        var n = $("#n"+node);
+       
+        if (j.length == 0) {
+          // e does not exists
+          newj = $("<div class=\"alert alert-primary running\" role=\"alert\" id=\"j" + jobid + "\"><i class=\"fas fa-wrench\"></i> job " + jobid + "&nbsp;<div class=\"loader\"></div></div>").hide().fadeIn(500);
+          n.append(newj);
+        } else {
+          // e exist
+          if (result == "ko") {
+            newj = $("<div class=\"alert alert-secondary\" role=\"alert\" id=\"j" + jobid + "\"><i class=\"fas fa-wrench\"></i> job " + jobid + " finished</div>").hide().fadeIn(500).fadeOut(2000);
+            j.replaceWith(newj);
+          } else {
+            newj = $("<div class=\"alert alert-success\" role=\"alert\" id=\"j" + jobid + "\"><i class=\"fas fa-wrench\"></i> job " + jobid + " found password ! - " + pass + "</div>");
+            j.replaceWith(newj);
+
+            $(".running").fadeOut(2000);
+            $('#timer').timer('pause');
+          }
+        }
+    };
+}
+</script>
+{{end}}

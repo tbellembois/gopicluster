@@ -1,0 +1,20 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {{template "head" .}}
+</head>
+<body>
+    
+    <div class="container">
+        {{template "header" .}}
+        {{template "menu" .}}
+        {{template "content" .}}
+        {{template "footer" .}}
+    </div>
+
+    {{template "foot" .}}
+    {{template "contentjs" .}}
+</body>
+</html>
+{{end}}
